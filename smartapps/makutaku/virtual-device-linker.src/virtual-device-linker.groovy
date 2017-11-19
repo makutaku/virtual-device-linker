@@ -1,5 +1,5 @@
 /**
- *  Sync Virtual Sensors
+ *  Virtual Device Linker
  *
  *  Copyright 2017 makutaku
  *
