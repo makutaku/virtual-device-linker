@@ -47,12 +47,18 @@ definition(
 def deviceAndActionsPage() {
     dynamicPage(name: "deviceAndActionsPage") {
         section {
-            input(name: "physicalSensors", type: "capability.${physicalSensorType}", title: "If the ${physicalSensorType} device", required: true, multiple: true)
+            input(name: "physicalSensors", type: "capability.${physicalSensorType}", title: "If the ${physicalSensorType} device", required: true, multiple: true, submitOnChange: true)
             input(name: "physicalSensorAction", type: "enum", title: "is", required: true, multiple: false, options: attributeValues(physicalSensorType))
         }
         section {
             input(name: "virtualSensors", type: "capability.${virtualSensorType}", title: "Perform on ${virtualSensorType}", required: true, multiple: true)
             input(name: "virtualSensorAction", type: "enum", title: "action", required: true, multiple: false, options: actionValues(virtualSensorType))
+            input(name: "delay", type: "number", title: "Delay in seconds", required: false, multiple: false, defaultValue: 0)
+         }
+         section {
+            input(name: "logicalOperation", type: "enum", title: "Logical Operation", required: false, multiple: false, defaultValue: "every",
+            	options: ["every":"All", "any":"Any"])
+            
          }
     }
 }
@@ -60,13 +66,11 @@ def deviceAndActionsPage() {
 // A method that will set the default label of the automation.
 // It uses the lights selected and action to create the automation label
 def defaultLabel() {
+    def physicalSensorsText = (physicalSensors.size() > 1) ? 
+    	"When ${logicalOperation} ${physicalSensors.displayName} are ${physicalSensorAction}" : 
+        "When ${physicalSensors.displayName} is ${physicalSensorAction}"
 
-	//def physicalDeviceNames = physicalSensors.collect { "${it.displayName}" }.join(",")
-    def verb = (physicalSensors.size() > 1) ? "are" : "is"
-
-	//def virtualDeviceNames = virtualSensors.collect { "${it.displayName}" }.join(",")
-
-	return "When ${physicalSensors.displayName} ${verb} ${physicalSensorAction}, perform ${virtualSensorAction} on ${virtualSensors.displayName}"
+	return "${physicalSensorsText}, perform ${virtualSensorAction} on ${virtualSensors.displayName}"
 }
 
 private attributeValues(attributeName) {
@@ -124,16 +128,17 @@ def initialize() {
 }
 
 def	physicalSensorEventHandler(evt)	{
-	log.debug "Handled event ${evt.name} with value ${evt.value} from physical device ${evt.displayName} "  
+	log.debug "Handled event ${evt.name} with value ${evt.value} from physical device ${evt.displayName}"  
     
-    if (physicalSensors.every{sensor -> sensor.currentValue(evt.name) == evt.value}) {
-        log.debug "Invoking action ${virtualSensorAction} on virtual device ${virtualSensors.displayName}"
-        virtualSensors."${virtualSensorAction}"()
-        log.debug "Invoked action ${virtualSensorAction} on virtual device ${virtualSensors.displayName}"
+    if (physicalSensors."${logicalOperation}"{sensor -> sensor.currentValue(evt.name) == evt.value}) {
+    	runIn(delay, invokeAction)
     }
-    else {
-    	log.debug "Not all physical devices have state ${evt.name} set to ${evt.value} yet."
-    }
+}
+
+def invokeAction() {
+    log.debug "Invoking action ${virtualSensorAction} on virtual device ${virtualSensors.displayName}"
+    virtualSensors."${virtualSensorAction}"()
+    log.debug "Invoked action ${virtualSensorAction} on virtual device ${virtualSensors.displayName}"
 }
 
 def	virtualSensorEventHandler(evt)	{
