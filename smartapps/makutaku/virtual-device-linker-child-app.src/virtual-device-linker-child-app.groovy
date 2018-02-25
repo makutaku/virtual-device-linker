@@ -26,17 +26,24 @@ definition(
 
  preferences {
  
- 	def sensorTypes = [
+ 	def physicalSensorTypes = [
+                "contactSensor":"Open/Closed Sensor",
+                "motionSensor":"Motion Sensor",
+                "switch": "Switch",
+                "presenceSensor": "Presence Sensor",
+                "moistureSensor": "Moisture Sensor"]
+ 
+  	def virtualSensorTypes = [
                 "contactSensor":"Open/Closed Sensor",
                 "motionSensor":"Motion Sensor",
                 "switch": "Switch",
                 "moistureSensor": "Moisture Sensor"]
- 
+                
     page(name: "sensorTypePage", title: "Select sensor types", nextPage: "deviceAndActionsPage", uninstall: true) {
         section {
-            input(name: "physicalSensorType", type: "enum", title: "Which sensor type is the physical device?", required: true, multiple: false, options: sensorTypes)
+            input(name: "physicalSensorType", type: "enum", title: "Which sensor type is the physical device?", required: true, multiple: false, options: physicalSensorTypes)
 
-            input(name: "virtualSensorType", type: "enum", title: "Which sensor type is the virtual device?", required: true, multiple: false, options: sensorTypes)
+            input(name: "virtualSensorType", type: "enum", title: "Which sensor type is the virtual device?", required: true, multiple: false, options: virtualSensorTypes)
             
         }
     }
@@ -79,6 +86,7 @@ private attributeValues(attributeName) {
         "switch": ["on","off"],
         "contactSensor": ["open","closed"],
         "motionSensor":["active","inactive"],
+        "presenceSensor":["present","not present"],
         "moistureSensor":["wet","dry"]]
         
     return sensorEvents.containsKey(attributeName) ? sensorEvents[attributeName] : ["UNDEFINED"]
@@ -90,6 +98,7 @@ private actionValues(attributeName) {
         "switch": ["on","off"],
         "contactSensor": ["open","close"],
         "motionSensor":["active","inactive"],
+        "presenceSensor":["arrived","left"],
         "moistureSensor":["wet","dry"]]
         
     return sensorActions.containsKey(attributeName) ? sensorActions[attributeName] : ["UNDEFINED"]
@@ -115,7 +124,8 @@ def initialize() {
     }
     
     if (physicalSensors)	{
-    	def eventType = (physicalSensorType - "Sensor") + "." + physicalSensorAction
+    	//def eventType = (physicalSensorType - "Sensor") + "." + physicalSensorAction
+        def eventType = (physicalSensorType - "Sensor")
     	log.debug "Subscribing to physical device event ${eventType} ..."
     	subscribe(physicalSensors, eventType, physicalSensorEventHandler)
 	}
@@ -130,7 +140,12 @@ def initialize() {
 def	physicalSensorEventHandler(evt)	{
 	log.debug "Handled event ${evt.name} with value ${evt.value} from physical device ${evt.displayName}"  
     
-    if (physicalSensors."${logicalOperation}"{sensor -> sensor.currentValue(evt.name) == evt.value}) {
+    log.debug "unscheduling action"
+    unschedule(invokeAction)
+    log.debug "unscheduled action"
+    
+    if (physicalSensors."${logicalOperation}"{sensor -> sensor.currentValue(evt.name) == physicalSensorAction}) {
+    	log.debug "Scheduling action"
     	runIn(delay, invokeAction)
     }
 }
